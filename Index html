@@ -1,0 +1,542 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wealth Tycoon 2026</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --gold: #fbbf24; --green: #22c55e; --bg: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; overflow: hidden; user-select: none; }
+       
+        #header { background: #1e293b; padding: 20px; border-bottom: 3px solid var(--gold); }
+        #money-display { font-size: 2.5rem; font-weight: bold; color: var(--green); margin: 10px 0; }
+        #mps-display { color: var(--gold); font-size: 1rem; }
+
+        #click-area { height: 40vh; display: flex; align-items: center; justify-content: center; position: relative; }
+        #main-coin { width: 150px; height: 150px; background: var(--gold); border-radius: 50%; border: 8px solid #d97706; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 5rem; transition: 0.1s; box-shadow: 0 0 30px rgba(251, 191, 36, 0.3); }
+        #main-coin:active { transform: scale(0.9); }
+
+        #shop { height: 40vh; background: #1e293b; overflow-y: auto; padding: 15px; border-top-left-radius: 25px; border-top-right-radius: 25px; }
+        .upgrade-card { background: #334155; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #475569; }
+        .upgrade-card.locked { opacity: 0.5; filter: grayscale(1); }
+        .buy-btn { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+       
+        .floating-text { position: absolute; color: var(--green); font-weight: bold; animation: floatUp 0.8s ease-out forwards; pointer-events: none; }
+        @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div id="money-display">$0</div>
+        <div id="mps-display">Passive Income: $0/sec</div>
+    </div>
+
+    <div id="click-area">
+        <div id="main-coin" onclick="handleTap(event)">💰</div>
+    </div>
+
+    <div id="shop">
+        <h3 style="margin-top:0;">💼 INVESTMENTS</h3>
+        <div id="upgrade-list">
+            </div>
+        <button onclick="saveToLeaderboard()" style="margin-top: 15px; background: var(--gold); padding: 10px; width: 100%; border-radius: 10px; border: none; font-weight: bold;">SUBMIT SCORE TO MBARARA BOARD</button>
+    </div>
+
+    <script>
+        let money = parseFloat(localStorage.getItem('tycoon_money')) || 0;
+        let mps = 0; // Money Per Second
+       
+        const upgrades = [
+            { id: 1, name: "Small Kiosk", cost: 15, income: 1, owned: 0 },
+            { id: 2, name: "Boda Boda Fleet", cost: 100, income: 5, owned: 0 },
+            { id: 3, name: "Mbarara Hotel", cost: 1100, income: 45, owned: 0 },
+            { id: 4, name: "Oil Refinery", cost: 12000, income: 250, owned: 0 }
+        ];
+
+        // Load saved upgrades
+        upgrades.forEach(u => {
+            u.owned = parseInt(localStorage.getItem('tycoon_upg_'+u.id)) || 0;
+            u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+        });
+
+        function updateUI() {
+            document.getElementById('money-display').innerText = "$" + Math.floor(money).toLocaleString();
+            document.getElementById('mps-display').innerText = "Passive Income: $" + mps.toLocaleString() + "/sec";
+            renderShop();
+        }
+
+        function renderShop() {
+            const list = document.getElementById('upgrade-list');
+            list.innerHTML = '';
+            upgrades.forEach(u => {
+                const card = document.createElement('div');
+                card.className = `upgrade-card ${money < u.cost ? 'locked' : ''}`;
+                card.innerHTML = `
+                    <div style="text-align:left">
+                        <div style="font-weight:bold">${u.name} (${u.owned})</div>
+                        <div style="font-size:0.8rem; color:var(--gold)">+$${u.income}/s • Cost: $${u.cost}</div>
+                    </div>
+                    <button class="buy-btn" onclick="buyUpgrade(${u.id})">BUY</button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function handleTap(e) {
+            money += 1;
+            createFloatingText(e.clientX, e.clientY, "+$1");
+            if(navigator.vibrate) navigator.vibrate(10);
+            updateUI();
+        }
+
+        function createFloatingText(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.innerText = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        window.buyUpgrade = (id) => {
+            const u = upgrades.find(up => up.id === id);
+            if (money >= u.cost) {
+                money -= u.cost;
+                u.owned++;
+                u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+                localStorage.setItem('tycoon_upg_'+id, u.owned);
+                calculateMPS();
+                updateUI();
+            }
+        };
+
+        function calculateMPS() {
+            mps = upgrades.reduce((total, u) => total + (u.owned * u.income), 0);
+        }
+
+        // Game Loop (Passive Income)
+        setInterval(() => {
+            money += mps;
+            localStorage.setItem('tycoon_money', money);
+            updateUI();
+        }, 1000);
+
+        function saveToLeaderboard() {
+            alert("Saving your empire of $" + Math.floor(money) + " to the board!");
+            // Firebase logic would go here same as before
+        }
+
+        calculateMPS();
+        updateUI();
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wealth Tycoon 2026</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --gold: #fbbf24; --green: #22c55e; --bg: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; overflow: hidden; user-select: none; }
+       
+        #header { background: #1e293b; padding: 20px; border-bottom: 3px solid var(--gold); }
+        #money-display { font-size: 2.5rem; font-weight: bold; color: var(--green); margin: 10px 0; }
+        #mps-display { color: var(--gold); font-size: 1rem; }
+
+        #click-area { height: 40vh; display: flex; align-items: center; justify-content: center; position: relative; }
+        #main-coin { width: 150px; height: 150px; background: var(--gold); border-radius: 50%; border: 8px solid #d97706; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 5rem; transition: 0.1s; box-shadow: 0 0 30px rgba(251, 191, 36, 0.3); }
+        #main-coin:active { transform: scale(0.9); }
+
+        #shop { height: 40vh; background: #1e293b; overflow-y: auto; padding: 15px; border-top-left-radius: 25px; border-top-right-radius: 25px; }
+        .upgrade-card { background: #334155; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #475569; }
+        .upgrade-card.locked { opacity: 0.5; filter: grayscale(1); }
+        .buy-btn { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+       
+        .floating-text { position: absolute; color: var(--green); font-weight: bold; animation: floatUp 0.8s ease-out forwards; pointer-events: none; }
+        @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div id="money-display">$0</div>
+        <div id="mps-display">Passive Income: $0/sec</div>
+    </div>
+
+    <div id="click-area">
+        <div id="main-coin" onclick="handleTap(event)">💰</div>
+    </div>
+
+    <div id="shop">
+        <h3 style="margin-top:0;">💼 INVESTMENTS</h3>
+        <div id="upgrade-list">
+            </div>
+        <button onclick="saveToLeaderboard()" style="margin-top: 15px; background: var(--gold); padding: 10px; width: 100%; border-radius: 10px; border: none; font-weight: bold;">SUBMIT SCORE TO MBARARA BOARD</button>
+    </div>
+
+    <script>
+        let money = parseFloat(localStorage.getItem('tycoon_money')) || 0;
+        let mps = 0; // Money Per Second
+       
+        const upgrades = [
+            { id: 1, name: "Small Kiosk", cost: 15, income: 1, owned: 0 },
+            { id: 2, name: "Boda Boda Fleet", cost: 100, income: 5, owned: 0 },
+            { id: 3, name: "Mbarara Hotel", cost: 1100, income: 45, owned: 0 },
+            { id: 4, name: "Oil Refinery", cost: 12000, income: 250, owned: 0 }
+        ];
+
+        // Load saved upgrades
+        upgrades.forEach(u => {
+            u.owned = parseInt(localStorage.getItem('tycoon_upg_'+u.id)) || 0;
+            u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+        });
+
+        function updateUI() {
+            document.getElementById('money-display').innerText = "$" + Math.floor(money).toLocaleString();
+            document.getElementById('mps-display').innerText = "Passive Income: $" + mps.toLocaleString() + "/sec";
+            renderShop();
+        }
+
+        function renderShop() {
+            const list = document.getElementById('upgrade-list');
+            list.innerHTML = '';
+            upgrades.forEach(u => {
+                const card = document.createElement('div');
+                card.className = `upgrade-card ${money < u.cost ? 'locked' : ''}`;
+                card.innerHTML = `
+                    <div style="text-align:left">
+                        <div style="font-weight:bold">${u.name} (${u.owned})</div>
+                        <div style="font-size:0.8rem; color:var(--gold)">+$${u.income}/s • Cost: $${u.cost}</div>
+                    </div>
+                    <button class="buy-btn" onclick="buyUpgrade(${u.id})">BUY</button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function handleTap(e) {
+            money += 1;
+            createFloatingText(e.clientX, e.clientY, "+$1");
+            if(navigator.vibrate) navigator.vibrate(10);
+            updateUI();
+        }
+
+        function createFloatingText(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.innerText = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        window.buyUpgrade = (id) => {
+            const u = upgrades.find(up => up.id === id);
+            if (money >= u.cost) {
+                money -= u.cost;
+                u.owned++;
+                u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+                localStorage.setItem('tycoon_upg_'+id, u.owned);
+                calculateMPS();
+                updateUI();
+            }
+        };
+
+        function calculateMPS() {
+            mps = upgrades.reduce((total, u) => total + (u.owned * u.income), 0);
+        }
+
+        // Game Loop (Passive Income)
+        setInterval(() => {
+            money += mps;
+            localStorage.setItem('tycoon_money', money);
+            updateUI();
+        }, 1000);
+
+        function saveToLeaderboard() {
+            alert("Saving your empire of $" + Math.floor(money) + " to the board!");
+            // Firebase logic would go here same as before
+        }
+
+        calculateMPS();
+        updateUI();
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wealth Tycoon 2026</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --gold: #fbbf24; --green: #22c55e; --bg: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; overflow: hidden; user-select: none; }
+       
+        #header { background: #1e293b; padding: 20px; border-bottom: 3px solid var(--gold); }
+        #money-display { font-size: 2.5rem; font-weight: bold; color: var(--green); margin: 10px 0; }
+        #mps-display { color: var(--gold); font-size: 1rem; }
+
+        #click-area { height: 40vh; display: flex; align-items: center; justify-content: center; position: relative; }
+        #main-coin { width: 150px; height: 150px; background: var(--gold); border-radius: 50%; border: 8px solid #d97706; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 5rem; transition: 0.1s; box-shadow: 0 0 30px rgba(251, 191, 36, 0.3); }
+        #main-coin:active { transform: scale(0.9); }
+
+        #shop { height: 40vh; background: #1e293b; overflow-y: auto; padding: 15px; border-top-left-radius: 25px; border-top-right-radius: 25px; }
+        .upgrade-card { background: #334155; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #475569; }
+        .upgrade-card.locked { opacity: 0.5; filter: grayscale(1); }
+        .buy-btn { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+       
+        .floating-text { position: absolute; color: var(--green); font-weight: bold; animation: floatUp 0.8s ease-out forwards; pointer-events: none; }
+        @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div id="money-display">$0</div>
+        <div id="mps-display">Passive Income: $0/sec</div>
+    </div>
+
+    <div id="click-area">
+        <div id="main-coin" onclick="handleTap(event)">💰</div>
+    </div>
+
+    <div id="shop">
+        <h3 style="margin-top:0;">💼 INVESTMENTS</h3>
+        <div id="upgrade-list">
+            </div>
+        <button onclick="saveToLeaderboard()" style="margin-top: 15px; background: var(--gold); padding: 10px; width: 100%; border-radius: 10px; border: none; font-weight: bold;">SUBMIT SCORE TO MBARARA BOARD</button>
+    </div>
+
+    <script>
+        let money = parseFloat(localStorage.getItem('tycoon_money')) || 0;
+        let mps = 0; // Money Per Second
+       
+        const upgrades = [
+            { id: 1, name: "Small Kiosk", cost: 15, income: 1, owned: 0 },
+            { id: 2, name: "Boda Boda Fleet", cost: 100, income: 5, owned: 0 },
+            { id: 3, name: "Mbarara Hotel", cost: 1100, income: 45, owned: 0 },
+            { id: 4, name: "Oil Refinery", cost: 12000, income: 250, owned: 0 }
+        ];
+
+        // Load saved upgrades
+        upgrades.forEach(u => {
+            u.owned = parseInt(localStorage.getItem('tycoon_upg_'+u.id)) || 0;
+            u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+        });
+
+        function updateUI() {
+            document.getElementById('money-display').innerText = "$" + Math.floor(money).toLocaleString();
+            document.getElementById('mps-display').innerText = "Passive Income: $" + mps.toLocaleString() + "/sec";
+            renderShop();
+        }
+
+        function renderShop() {
+            const list = document.getElementById('upgrade-list');
+            list.innerHTML = '';
+            upgrades.forEach(u => {
+                const card = document.createElement('div');
+                card.className = `upgrade-card ${money < u.cost ? 'locked' : ''}`;
+                card.innerHTML = `
+                    <div style="text-align:left">
+                        <div style="font-weight:bold">${u.name} (${u.owned})</div>
+                        <div style="font-size:0.8rem; color:var(--gold)">+$${u.income}/s • Cost: $${u.cost}</div>
+                    </div>
+                    <button class="buy-btn" onclick="buyUpgrade(${u.id})">BUY</button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function handleTap(e) {
+            money += 1;
+            createFloatingText(e.clientX, e.clientY, "+$1");
+            if(navigator.vibrate) navigator.vibrate(10);
+            updateUI();
+        }
+
+        function createFloatingText(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.innerText = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        window.buyUpgrade = (id) => {
+            const u = upgrades.find(up => up.id === id);
+            if (money >= u.cost) {
+                money -= u.cost;
+                u.owned++;
+                u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+                localStorage.setItem('tycoon_upg_'+id, u.owned);
+                calculateMPS();
+                updateUI();
+            }
+        };
+
+        function calculateMPS() {
+            mps = upgrades.reduce((total, u) => total + (u.owned * u.income), 0);
+        }
+
+        // Game Loop (Passive Income)
+        setInterval(() => {
+            money += mps;
+            localStorage.setItem('tycoon_money', money);
+            updateUI();
+        }, 1000);
+
+        function saveToLeaderboard() {
+            alert("Saving your empire of $" + Math.floor(money) + " to the board!");
+            // Firebase logic would go here same as before
+        }
+
+        calculateMPS();
+        updateUI();
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wealth Tycoon 2026</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --gold: #fbbf24; --green: #22c55e; --bg: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; overflow: hidden; user-select: none; }
+       
+        #header { background: #1e293b; padding: 20px; border-bottom: 3px solid var(--gold); }
+        #money-display { font-size: 2.5rem; font-weight: bold; color: var(--green); margin: 10px 0; }
+        #mps-display { color: var(--gold); font-size: 1rem; }
+
+        #click-area { height: 40vh; display: flex; align-items: center; justify-content: center; position: relative; }
+        #main-coin { width: 150px; height: 150px; background: var(--gold); border-radius: 50%; border: 8px solid #d97706; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 5rem; transition: 0.1s; box-shadow: 0 0 30px rgba(251, 191, 36, 0.3); }
+        #main-coin:active { transform: scale(0.9); }
+
+        #shop { height: 40vh; background: #1e293b; overflow-y: auto; padding: 15px; border-top-left-radius: 25px; border-top-right-radius: 25px; }
+        .upgrade-card { background: #334155; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #475569; }
+        .upgrade-card.locked { opacity: 0.5; filter: grayscale(1); }
+        .buy-btn { background: var(--green); color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+       
+        .floating-text { position: absolute; color: var(--green); font-weight: bold; animation: floatUp 0.8s ease-out forwards; pointer-events: none; }
+        @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div id="money-display">$0</div>
+        <div id="mps-display">Passive Income: $0/sec</div>
+    </div>
+
+    <div id="click-area">
+        <div id="main-coin" onclick="handleTap(event)">💰</div>
+    </div>
+
+    <div id="shop">
+        <h3 style="margin-top:0;">💼 INVESTMENTS</h3>
+        <div id="upgrade-list">
+            </div>
+        <button onclick="saveToLeaderboard()" style="margin-top: 15px; background: var(--gold); padding: 10px; width: 100%; border-radius: 10px; border: none; font-weight: bold;">SUBMIT SCORE TO MBARARA BOARD</button>
+    </div>
+
+    <script>
+        let money = parseFloat(localStorage.getItem('tycoon_money')) || 0;
+        let mps = 0; // Money Per Second
+       
+        const upgrades = [
+            { id: 1, name: "Small Kiosk", cost: 15, income: 1, owned: 0 },
+            { id: 2, name: "Boda Boda Fleet", cost: 100, income: 5, owned: 0 },
+            { id: 3, name: "Mbarara Hotel", cost: 1100, income: 45, owned: 0 },
+            { id: 4, name: "Oil Refinery", cost: 12000, income: 250, owned: 0 }
+        ];
+
+        // Load saved upgrades
+        upgrades.forEach(u => {
+            u.owned = parseInt(localStorage.getItem('tycoon_upg_'+u.id)) || 0;
+            u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+        });
+
+        function updateUI() {
+            document.getElementById('money-display').innerText = "$" + Math.floor(money).toLocaleString();
+            document.getElementById('mps-display').innerText = "Passive Income: $" + mps.toLocaleString() + "/sec";
+            renderShop();
+        }
+
+        function renderShop() {
+            const list = document.getElementById('upgrade-list');
+            list.innerHTML = '';
+            upgrades.forEach(u => {
+                const card = document.createElement('div');
+                card.className = `upgrade-card ${money < u.cost ? 'locked' : ''}`;
+                card.innerHTML = `
+                    <div style="text-align:left">
+                        <div style="font-weight:bold">${u.name} (${u.owned})</div>
+                        <div style="font-size:0.8rem; color:var(--gold)">+$${u.income}/s • Cost: $${u.cost}</div>
+                    </div>
+                    <button class="buy-btn" onclick="buyUpgrade(${u.id})">BUY</button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function handleTap(e) {
+            money += 1;
+            createFloatingText(e.clientX, e.clientY, "+$1");
+            if(navigator.vibrate) navigator.vibrate(10);
+            updateUI();
+        }
+
+        function createFloatingText(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.innerText = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        window.buyUpgrade = (id) => {
+            const u = upgrades.find(up => up.id === id);
+            if (money >= u.cost) {
+                money -= u.cost;
+                u.owned++;
+                u.cost = Math.floor(u.cost * Math.pow(1.15, u.owned));
+                localStorage.setItem('tycoon_upg_'+id, u.owned);
+                calculateMPS();
+                updateUI();
+            }
+        };
+
+        function calculateMPS() {
+            mps = upgrades.reduce((total, u) => total + (u.owned * u.income), 0);
+        }
+
+        // Game Loop (Passive Income)
+        setInterval(() => {
+            money += mps;
+            localStorage.setItem('tycoon_money', money);
+            updateUI();
+        }, 1000);
+
+        function saveToLeaderboard() {
+            alert("Saving your empire of $" + Math.floor(money) + " to the board!");
+            // Firebase logic would go here same as before
+        }
+
+        calculateMPS();
+        updateUI();
+    </script>
+</body>
+</html>vvvvvv
